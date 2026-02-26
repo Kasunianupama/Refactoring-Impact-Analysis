@@ -1,7 +1,144 @@
-# df = read.csv("/Users/tiyanigurusinghe/Downloads/code_smells_refactoring_dataset_120k.csv")
+library(dplyr)
+library(ggplot2)
+library(corrplot)
+
+df = read.csv("/Users/tiyanigurusinghe/Downloads/code_smells_refactoring_dataset_120k.csv")
 head(df)
 df$delta_refraction_complexity = df$post_refactor_complexity - df$pre_refactor_complexity
+df$true_complexity = ifelse(df$refactoring_applied == 1, df$post_refactor_complexity,df$pre_refactor_complexity)
 head(df)
+df = df %>%
+  mutate(
+    refactoring_applied = as.factor(refactoring_applied),
+    language = as.factor(language),
+    framework = as.factor(framework),
+    code_smell_type = as.factor(code_smell_type),
+    smell_severity = as.factor(smell_severity),
+    refactoring_suggested = as.factor(refactoring_suggested)
+  )
+# checking na
+colSums(is.na(df))
+
+
+# EDA
+# Boxplot for Readability (Complexity)
+dim(df)
+glimpse(df)
+summary(df)
+
+refactor_counts = table(df$refactoring_applied)
+print(refactor_counts)
+refactor_percentages = prop.table(refactor_counts) * 100
+print(refactor_percentages)
+
+# 1. What languages are most common in this dataset?
+table(df$language)
+
+# 2. What frameworks are we dealing with?
+table(df$framework)
+
+# 3. What are the most common code smells developers are facing?
+table(df$code_smell_type)
+
+# 4. How severe are these smells usually?
+table(df$smell_severity)
+
+# Bar chart of Code Smell Severities
+ggplot(df, aes(x = smell_severity, fill = smell_severity)) +
+  geom_bar() +
+  labs(title = "Count of Code Smells by Severity",
+       x = "Severity Level",
+       y = "Number of Files") +
+  theme_minimal()
+
+# Bar chart of Refactoring Applied
+ggplot(df, aes(x = as.factor(refactoring_applied), fill = as.factor(refactoring_applied))) +
+  geom_bar() +
+  labs(title = "How Many Files Were Refactored?",
+       x = "Refactoring Applied (0 = No, 1 = Yes)",
+       y = "Count") +
+  theme_minimal() +
+  scale_fill_manual(values = c("salmon", "skyblue"))
+
+
+categorical_cols = names(df)[sapply(df, function(x) is.factor(x) | is.character(x))]
+
+for (col in categorical_cols) {
+  
+  # Print a nice header so the output is easy to read
+  cat("\n=========================================\n")
+  cat("Frequency Counts for:", col, "\n")
+  cat("=========================================\n")
+  
+  # Print the table. 
+  print(table(df[[col]], useNA = "ifany")) 
+}
+
+ggplot(df, aes(x = refactoring_applied, y = true_complexity, fill = refactoring_applied)) +
+  geom_boxplot() +
+  labs(title = "Readability: True Complexity by Refactoring Status",
+       x = "Refactoring Applied (0 = No, 1 = Yes)",
+       y = "True Complexity") +
+  theme_minimal() +
+  scale_fill_manual(values = c("salmon", "skyblue"))
+
+# 1. Maintainability Index
+ggplot(df, aes(x = refactoring_applied, y = maintainability_index, fill = refactoring_applied)) +
+  geom_boxplot() +
+  labs(title = "Maintainability Index by Refactoring Status") +
+  theme_minimal()
+
+# 2. Technical Debt Minutes
+ggplot(df, aes(x = refactoring_applied, y = technical_debt_minutes, fill = refactoring_applied)) +
+  geom_boxplot() +
+  labs(title = "Technical Debt (Minutes) by Refactoring Status") +
+  theme_minimal()
+
+# 3. Bug Prone Score
+ggplot(df, aes(x = refactoring_applied, y = bug_prone_score, fill = refactoring_applied)) +
+  geom_boxplot() +
+  labs(title = "Bug Prone Score by Refactoring Status") +
+  theme_minimal()
+
+# Example: Does the Maintainability Index improvement differ by Language?
+ggplot(df, aes(x = refactoring_applied, y = maintainability_index, fill = refactoring_applied)) +
+  geom_boxplot() +
+  facet_wrap(~ language) + # This splits the plot into separate panels for each language
+  labs(title = "Maintainability Index by Refactoring Status, Split by Language") +
+  theme_minimal()
+
+ 
+library(ggplot2)
+
+# Boxplot for Readability (True Complexity) split by Language
+ggplot(df, aes(x = refactoring_applied, y = true_complexity, fill = refactoring_applied)) +
+  geom_boxplot() +
+  facet_wrap(~ language) + # This creates a separate mini-plot for each language
+  labs(title = "Readability: True Complexity by Refactoring Status, Split by Language",
+       x = "Refactoring Applied (0 = No, 1 = Yes)",
+       y = "True Complexity",
+       fill = "Refactored") +
+  theme_minimal() +
+  scale_fill_manual(values = c("salmon", "skyblue"))
+
+numeric_metrics = df %>%
+  select(true_complexity, technical_debt_minutes, bug_prone_score, lines_of_code)
+cor_matrix = cor(numeric_metrics, use = "complete.obs")
+
+print("--- Correlation Matrix ---")
+print(cor_matrix)
+
+# 4. Generate the visual correlation plot
+corrplot(cor_matrix, 
+         method = "color",       # Fill the squares with color based on strength
+         type = "upper",         # Only show the top half (the bottom half is just a mirror)
+         addCoef.col = "black",  # Print the exact correlation number inside the squares
+         tl.col = "black",       # Make the text labels black
+         tl.srt = 45,            # Rotate the top labels 45 degrees to fit nicely
+         title = "Correlation Between Code Metrics",
+         mar = c(0, 0, 2, 0))    # Adjust margins so the title isn't cut off
+
+#HYPOTHESIS TYESTING
 
 hist(df$delta_refraction_complexity, main = "Histogram of Delta Refraction Complexity", xlab = "Delta Complexity", col = "skyblue")
 hist(df$delta_refraction_complexity[df$refactoring_applied == 1],
@@ -147,11 +284,6 @@ wilcox_debt = wilcox.test(technical_debt_minutes ~ refactoring_applied, data = d
 print("--- Wilcoxon Test: Technical Debt Minutes ---")
 print(wilcox_debt)
 
-
-# Create the true complexity column based on reality
-df$true_complexity = ifelse(df$refactoring_applied == 1, 
-                            df$post_refactor_complexity, 
-                            df$pre_refactor_complexity)
 head(df[, c("refactoring_applied", "pre_refactor_complexity", "post_refactor_complexity", "true_complexity")])
 
 # Build the multiple linear regression model
@@ -180,7 +312,7 @@ df$smell_severity = as.factor(df$smell_severity)
 
 anova_severity = aov(delta_refraction_complexity ~ smell_severity, data = df)
 summary(anova_severity)
-# The asterisk (*) tests Type, Severity, AND their combination
+
 anova_combined = aov(delta_refraction_complexity ~ refactoring_suggested * smell_severity, data = df)
 
 summary(anova_combined)
@@ -199,5 +331,4 @@ summary(anova_true_type)
 anova_true_severity = aov(true_complexity ~ refactoring_applied * smell_severity, data = df)
 print("--- ANOVA: True Complexity by Applied and Severity ---")
 summary(anova_true_severity)
-
 
