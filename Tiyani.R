@@ -1,4 +1,4 @@
-df = read.csv("/Users/tiyanigurusinghe/Downloads/code_smells_refactoring_dataset_120k.csv")
+# df = read.csv("/Users/tiyanigurusinghe/Downloads/code_smells_refactoring_dataset_120k.csv")
 head(df)
 df$delta_refraction_complexity = df$post_refactor_complexity - df$pre_refactor_complexity
 head(df)
@@ -199,4 +199,5 @@ summary(anova_true_type)
 anova_true_severity = aov(true_complexity ~ refactoring_applied * smell_severity, data = df)
 print("--- ANOVA: True Complexity by Applied and Severity ---")
 summary(anova_true_severity)
+
 
